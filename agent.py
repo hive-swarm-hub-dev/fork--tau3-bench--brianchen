@@ -7,7 +7,13 @@ and must follow the domain policy to resolve banking customer requests.
 
 import json
 import os
+import sys
 from typing import Optional
+
+# Suppress loguru warnings during import so eval.sh can cleanly read RETRIEVAL_VARIANT
+from loguru import logger
+logger.remove()
+logger.add(sys.stderr, level="ERROR")
 
 from tau2.agent.base_agent import HalfDuplexAgent, ValidAgentInputMessage
 from tau2.data_model.message import (
