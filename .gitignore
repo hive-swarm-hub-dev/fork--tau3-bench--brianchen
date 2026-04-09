@@ -6,3 +6,6 @@ __pycache__/
 tau3-bench/
 *.egg-info/
 .venv/
+.hive/
+run*.log
+results.tsv
