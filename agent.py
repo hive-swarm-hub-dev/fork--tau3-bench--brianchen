@@ -50,7 +50,6 @@ class AgentState:
     ):
         self.system_messages = system_messages
         self.messages = messages
-        self.seen_tool_names: set[str] = set()
 
 
 # ── Agent Implementation ─────────────────────────────────────────────────────
@@ -105,19 +104,17 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ) -> tuple[AssistantMessage, AgentState]:
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
-            # After KB search results, nudge the model about any NEW discoverable tools found
-            new_tools = set()
+            # After tool results, nudge about ANY discoverable tools found in this response.
+            # Always nudge (no dedup) — the model may not have acted on earlier nudges.
+            found_tools = set()
             for tm in message.tool_messages:
                 content = getattr(tm, 'content', '') or ''
-                for name in self._extract_tool_names(content):
-                    if name not in state.seen_tool_names:
-                        new_tools.add(name)
-                        state.seen_tool_names.add(name)
-            if new_tools:
+                found_tools.update(self._extract_tool_names(content))
+            if found_tools:
                 nudge = (
-                    f"[KB mentions tools: {', '.join(sorted(new_tools))}. "
-                    f"Agent tools: unlock_discoverable_agent_tool(name) then call_discoverable_agent_tool(name, args). "
-                    f"User tools: give_discoverable_user_tool(name).]"
+                    f"[Tools found in results: {', '.join(sorted(found_tools))}. "
+                    f"To use: unlock_discoverable_agent_tool(name) → call_discoverable_agent_tool(name, args). "
+                    f"User tools: give_discoverable_user_tool(name). Act on these NOW.]"
                 )
                 state.messages.append(
                     SystemMessage(role="system", content=nudge)
