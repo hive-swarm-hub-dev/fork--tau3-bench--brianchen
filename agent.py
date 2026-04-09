@@ -34,7 +34,7 @@ from tau2.utils.llm_utils import generate
 # Options: "bm25", "openai_embeddings", "qwen_embeddings", "grep_only",
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
-RETRIEVAL_VARIANT = "bm25_reranker"
+RETRIEVAL_VARIANT = "bm25"
 RETRIEVAL_KWARGS = {"top_k": 15}
 
 
