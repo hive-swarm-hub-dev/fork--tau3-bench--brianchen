@@ -7,6 +7,7 @@ and must follow the domain policy to resolve banking customer requests.
 
 import json
 import os
+import re
 import sys
 from typing import Optional
 
@@ -101,6 +102,13 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
             messages=list(message_history) if message_history else [],
         )
 
+    @staticmethod
+    def _extract_tool_names(text: str) -> list[str]:
+        """Extract discoverable tool names (word_word_1234 pattern) from text."""
+        if not text:
+            return []
+        return re.findall(r'\b[a-z][a-z_]+_\d{4}\b', text)
+
     def generate_next_message(
         self,
         message: ValidAgentInputMessage,
@@ -108,6 +116,19 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ) -> tuple[AssistantMessage, AgentState]:
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
+            # After KB search results, nudge the model about any discoverable tools found
+            for tm in message.tool_messages:
+                content = getattr(tm, 'content', '') or ''
+                tool_names = self._extract_tool_names(content)
+                if tool_names:
+                    nudge = (
+                        f"[Note: KB result mentions discoverable tools: {', '.join(tool_names)}. "
+                        f"Use unlock_discoverable_agent_tool(name) then call_discoverable_agent_tool(name, args) for agent tools, "
+                        f"or give_discoverable_user_tool(name) for user tools.]"
+                    )
+                    state.messages.append(
+                        SystemMessage(role="system", content=nudge)
+                    )
         else:
             state.messages.append(message)
 
