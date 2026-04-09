@@ -34,7 +34,7 @@ from tau2.utils.llm_utils import generate
 # Options: "bm25", "openai_embeddings", "qwen_embeddings", "grep_only",
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
-RETRIEVAL_VARIANT = "bm25"
+RETRIEVAL_VARIANT = "bm25_reranker"
 RETRIEVAL_KWARGS = {"top_k": 15}
 
 
@@ -90,11 +90,7 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
             f"- Authenticate (verify 2 of 4: DOB, email, phone, address) then call "
             f"log_verification BEFORE accessing/modifying account data.\n"
             f"- Complete ALL steps. If a tool call fails, search KB with different terms and retry. "
-            f"Never give up or transfer to human without exhausting all options.\n"
-            f"- Example discoverable tool workflow: KB says 'use open_bank_account_4821'. "
-            f"Step 1: unlock_discoverable_agent_tool('open_bank_account_4821'). "
-            f"Step 2: call_discoverable_agent_tool('open_bank_account_4821', args). "
-            f"Always complete both steps."
+            f"Never give up or transfer to human without exhausting all options."
         )
         return AgentState(
             system_messages=[SystemMessage(role="system", content=system_prompt)],
