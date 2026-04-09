@@ -33,7 +33,7 @@ from tau2.utils.llm_utils import generate
 # Options: "bm25", "openai_embeddings", "qwen_embeddings", "grep_only",
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
-RETRIEVAL_VARIANT = "bm25"
+RETRIEVAL_VARIANT = "openai_embeddings"
 RETRIEVAL_KWARGS = {"top_k": 15}
 
 
@@ -76,24 +76,20 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
         self, message_history: Optional[list[Message]] = None
     ) -> AgentState:
         system_prompt = (
-            f"You are an expert Rho-Bank customer service agent.\n\n"
             f"{self.domain_policy}\n\n"
-            f"## Strategy\n"
-            f"- ALWAYS search KB BEFORE answering or acting. Search MULTIPLE times with "
-            f"different, specific keywords. For product recommendations, search for EACH "
-            f"candidate product individually to get complete details (fees, eligibility, "
-            f"promotions, subscriber benefits).\n"
-            f"- Before recommending products, ask the customer about their Rho-Bank "
-            f"subscription status and existing accounts — these affect eligibility and pricing.\n"
-            f"- When KB results mention a tool name, follow the FULL discovery workflow: "
-            f"unlock_discoverable_agent_tool(name) → call_discoverable_agent_tool(name, args). "
-            f"For user tools: give_discoverable_user_tool(name) and explain usage.\n"
-            f"- For user lookup: try get_user_information_by_name AND get_user_information_by_email. "
-            f"If one fails, try the other.\n"
-            f"- Authenticate (verify 2 of 4: DOB, email, phone, address) then call "
-            f"log_verification BEFORE accessing/modifying account data.\n"
-            f"- Complete ALL steps. If a tool call fails, search KB with different terms and retry. "
-            f"Never give up or transfer to human without exhausting all options."
+            f"## Critical Rules\n"
+            f"1. SEARCH FIRST: Before ANY action or answer, search KB with specific queries. "
+            f"Search multiple times with varied keywords. Read results carefully for exact tool names and required steps.\n"
+            f"2. AUTHENTICATE: Before accessing/modifying customer data, verify identity: "
+            f"look up user via get_user_information_by_name (or by_email), ask customer to confirm "
+            f"2 of 4 (DOB, email, phone, address), then call log_verification with their info and get_current_time().\n"
+            f"3. TOOL DISCOVERY: When KB mentions a tool name (e.g. tool_name_1234):\n"
+            f"   - Agent tools: unlock_discoverable_agent_tool(exact_name) THEN call_discoverable_agent_tool(exact_name, args)\n"
+            f"   - User tools: give_discoverable_user_tool(exact_name) and explain what args the user needs to provide\n"
+            f"4. PERSISTENCE: Complete ALL required steps. Search KB again with different queries if stuck. "
+            f"Do not transfer to human or give up until you have exhausted every option in the KB.\n"
+            f"5. PRECISION: Use exact tool names from KB. Pass all required arguments. "
+            f"When KB says to do something, follow the procedure exactly as written."
         )
         return AgentState(
             system_messages=[SystemMessage(role="system", content=system_prompt)],
