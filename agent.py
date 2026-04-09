@@ -50,6 +50,7 @@ class AgentState:
     ):
         self.system_messages = system_messages
         self.messages = messages
+        self.seen_tool_names: set[str] = set()
 
 
 # ── Agent Implementation ─────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ):
         super().__init__(tools=tools, domain_policy=domain_policy)
         self.llm = llm
-        self.llm_args = llm_args or {"temperature": 0.0, "seed": 300, "max_tokens": 4096}
+        self.llm_args = llm_args or {"temperature": 0.0, "seed": 300}
 
     def get_init_state(
         self, message_history: Optional[list[Message]] = None
@@ -75,15 +76,25 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
             f"You are an expert Rho-Bank customer service agent.\n\n"
             f"{self.domain_policy}\n\n"
             f"## Strategy\n"
-            f"- Search KB MULTIPLE times with different keywords before acting. "
-            f"For product recommendations, search for EACH candidate product individually.\n"
-            f"- Ask about the customer's Rho-Bank subscription status and existing accounts "
-            f"before recommending products — these affect eligibility and pricing.\n"
+            f"- ALWAYS search KB BEFORE answering or acting. Search MULTIPLE times with "
+            f"different, specific keywords. For product recommendations, search for EACH "
+            f"candidate product individually to get complete details (fees, eligibility, "
+            f"promotions, subscriber benefits).\n"
+            f"- Before recommending products, ask the customer about their Rho-Bank "
+            f"subscription status and existing accounts — these affect eligibility and pricing.\n"
+            f"- When KB results mention a tool name, follow the FULL discovery workflow: "
+            f"unlock_discoverable_agent_tool(name) → call_discoverable_agent_tool(name, args). "
+            f"For user tools: give_discoverable_user_tool(name) and explain usage.\n"
             f"- For user lookup: try get_user_information_by_name AND get_user_information_by_email. "
             f"If one fails, try the other.\n"
-            f"- Before executing a multi-step procedure, plan all required steps. "
-            f"Complete ALL steps in order. If a tool call fails, search KB with different terms "
-            f"and retry. Never give up or transfer to human without exhausting all options."
+            f"- Authenticate (verify 2 of 4: DOB, email, phone, address) then call "
+            f"log_verification BEFORE accessing/modifying account data.\n"
+            f"- Complete ALL steps. If a tool call fails, search KB with different terms and retry. "
+            f"Never give up or transfer to human without exhausting all options.\n"
+            f"- Example discoverable tool workflow: KB says 'use open_bank_account_4821'. "
+            f"Step 1: unlock_discoverable_agent_tool('open_bank_account_4821'). "
+            f"Step 2: call_discoverable_agent_tool('open_bank_account_4821', args). "
+            f"Always complete both steps."
         )
         return AgentState(
             system_messages=[SystemMessage(role="system", content=system_prompt)],
@@ -104,17 +115,19 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ) -> tuple[AssistantMessage, AgentState]:
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
-            # After tool results, nudge about ANY discoverable tools found in this response.
-            # Always nudge (no dedup) — the model may not have acted on earlier nudges.
-            found_tools = set()
+            # After KB search results, nudge the model about any NEW discoverable tools found
+            new_tools = set()
             for tm in message.tool_messages:
                 content = getattr(tm, 'content', '') or ''
-                found_tools.update(self._extract_tool_names(content))
-            if found_tools:
+                for name in self._extract_tool_names(content):
+                    if name not in state.seen_tool_names:
+                        new_tools.add(name)
+                        state.seen_tool_names.add(name)
+            if new_tools:
                 nudge = (
-                    f"[Tools found in results: {', '.join(sorted(found_tools))}. "
-                    f"To use: unlock_discoverable_agent_tool(name) → call_discoverable_agent_tool(name, args). "
-                    f"User tools: give_discoverable_user_tool(name). Act on these NOW.]"
+                    f"[KB mentions tools: {', '.join(sorted(new_tools))}. "
+                    f"Agent tools: unlock_discoverable_agent_tool(name) then call_discoverable_agent_tool(name, args). "
+                    f"User tools: give_discoverable_user_tool(name).]"
                 )
                 state.messages.append(
                     SystemMessage(role="system", content=nudge)
@@ -141,5 +154,5 @@ def create_agent(tools, domain_policy, **kwargs):
         tools=tools,
         domain_policy=domain_policy,
         llm=kwargs.get("llm", "openai/gpt-5.4-mini"),
-        llm_args=kwargs.get("llm_args", {"temperature": 0.0, "seed": 300, "max_tokens": 4096}),
+        llm_args=kwargs.get("llm_args", {"temperature": 0.0, "seed": 300}),
     )
