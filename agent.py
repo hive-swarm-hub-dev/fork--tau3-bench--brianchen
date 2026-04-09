@@ -34,8 +34,8 @@ from tau2.utils.llm_utils import generate
 # Options: "bm25", "openai_embeddings", "qwen_embeddings", "grep_only",
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
-RETRIEVAL_VARIANT = "bm25_grep"
-RETRIEVAL_KWARGS = {"top_k": 15}
+RETRIEVAL_VARIANT = "bm25"
+RETRIEVAL_KWARGS = {"top_k": 20}
 
 
 # ── Agent State ──────────────────────────────────────────────────────────────
@@ -76,7 +76,9 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
             f"{self.domain_policy}\n\n"
             f"## Strategy\n"
             f"- ALWAYS search KB BEFORE answering or acting. Search MULTIPLE times with "
-            f"different, specific keywords. Use grep to search for specific tool names or patterns.\n"
+            f"different, specific keywords. For product recommendations, search for EACH "
+            f"candidate product individually to get complete details (fees, eligibility, "
+            f"promotions, subscriber benefits).\n"
             f"- Before recommending products, ask the customer about their Rho-Bank "
             f"subscription status and existing accounts — these affect eligibility and pricing.\n"
             f"- When KB results mention a tool name, follow the FULL discovery workflow: "
