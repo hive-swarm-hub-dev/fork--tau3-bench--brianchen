@@ -34,8 +34,8 @@ from tau2.utils.llm_utils import generate
 # Options: "bm25", "openai_embeddings", "qwen_embeddings", "grep_only",
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
-RETRIEVAL_VARIANT = "bm25"
-RETRIEVAL_KWARGS = {"top_k": 20}
+RETRIEVAL_VARIANT = "bm25_grep"
+RETRIEVAL_KWARGS = {"top_k": 15}
 
 
 # ── Agent State ──────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ):
         super().__init__(tools=tools, domain_policy=domain_policy)
         self.llm = llm
-        self.llm_args = llm_args or {"temperature": 0.0, "seed": 300}
+        self.llm_args = llm_args or {"temperature": 0.2, "seed": 300}
 
     def get_init_state(
         self, message_history: Optional[list[Message]] = None
@@ -76,9 +76,7 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
             f"{self.domain_policy}\n\n"
             f"## Strategy\n"
             f"- ALWAYS search KB BEFORE answering or acting. Search MULTIPLE times with "
-            f"different, specific keywords. For product recommendations, search for EACH "
-            f"candidate product individually to get complete details (fees, eligibility, "
-            f"promotions, subscriber benefits).\n"
+            f"different, specific keywords. Use grep to search for specific tool names or patterns.\n"
             f"- Before recommending products, ask the customer about their Rho-Bank "
             f"subscription status and existing accounts — these affect eligibility and pricing.\n"
             f"- When KB results mention a tool name, follow the FULL discovery workflow: "
@@ -145,5 +143,5 @@ def create_agent(tools, domain_policy, **kwargs):
         tools=tools,
         domain_policy=domain_policy,
         llm=kwargs.get("llm", "openai/gpt-5.4-mini"),
-        llm_args=kwargs.get("llm_args", {"temperature": 0.0, "seed": 300}),
+        llm_args=kwargs.get("llm_args", {"temperature": 0.2, "seed": 300}),
     )
