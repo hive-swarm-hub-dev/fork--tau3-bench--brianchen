@@ -67,7 +67,7 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ):
         super().__init__(tools=tools, domain_policy=domain_policy)
         self.llm = llm
-        self.llm_args = llm_args or {"temperature": 0.0, "seed": 42}
+        self.llm_args = llm_args or {"temperature": 0.0, "seed": 300}
 
     def get_init_state(
         self, message_history: Optional[list[Message]] = None
@@ -150,5 +150,5 @@ def create_agent(tools, domain_policy, **kwargs):
         tools=tools,
         domain_policy=domain_policy,
         llm=kwargs.get("llm", "openai/gpt-5.4-mini"),
-        llm_args=kwargs.get("llm_args", {"temperature": 0.0, "seed": 42}),
+        llm_args=kwargs.get("llm_args", {"temperature": 0.0, "seed": 300}),
     )
