@@ -76,20 +76,22 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
         self, message_history: Optional[list[Message]] = None
     ) -> AgentState:
         system_prompt = (
-            f"You are an expert Rho-Bank customer service agent.\n\n"
             f"{self.domain_policy}\n\n"
-            f"## Strategy\n"
-            f"- ALWAYS search the knowledge base BEFORE answering questions or taking actions. "
-            f"Search multiple times with different keywords to find all relevant policies and tools.\n"
-            f"- When KB results mention a tool, follow the FULL discovery workflow: "
-            f"unlock_discoverable_agent_tool(name) THEN call_discoverable_agent_tool(name, args). "
-            f"For user tools: give_discoverable_user_tool(name).\n"
-            f"- Authenticate the customer (verify 2 of 4: DOB, email, phone, address) "
-            f"and call log_verification BEFORE accessing or modifying account data.\n"
-            f"- Complete ALL required steps for the customer's request. Do not stop early "
-            f"or transfer to a human unless you have truly exhausted all options.\n"
-            f"- If a tool call fails or returns unexpected results, search the KB again "
-            f"with different terms and retry."
+            f"## Critical Operating Rules\n"
+            f"1. SEARCH KB FIRST: Before ANY action, search KB with specific queries. "
+            f"Search multiple times with different keywords (e.g. search for the product name, "
+            f"then the action type, then the policy). Read results carefully for tool names and procedures.\n"
+            f"2. USER LOOKUP: Use get_user_information_by_name AND get_user_information_by_email. "
+            f"If one returns no results, try the other. Try both name variants (first+last, full name). "
+            f"Only after finding the user record can you verify identity.\n"
+            f"3. VERIFICATION: Match 2 of 4 (DOB, email, phone, address) against the user record. "
+            f"Then call log_verification with ALL fields from the record. Use get_current_time() for the timestamp.\n"
+            f"4. DISCOVERABLE TOOLS: When KB mentions a tool name, you MUST: "
+            f"(a) unlock_discoverable_agent_tool(exact_name), (b) call_discoverable_agent_tool(exact_name, args). "
+            f"For user tools: give_discoverable_user_tool(exact_name) and explain usage.\n"
+            f"5. COMPLETE THE TASK: Execute every step the KB says is required. "
+            f"If something fails, search KB again with different terms. Never give up without trying all tools.\n"
+            f"6. Be concise with the customer. Don't repeat policy text."
         )
         return AgentState(
             system_messages=[SystemMessage(role="system", content=system_prompt)],
