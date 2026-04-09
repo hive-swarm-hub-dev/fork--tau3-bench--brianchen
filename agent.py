@@ -34,7 +34,7 @@ from tau2.utils.llm_utils import generate
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
 RETRIEVAL_VARIANT = "bm25"
-RETRIEVAL_KWARGS = {}  # e.g. {"top_k": 10}
+RETRIEVAL_KWARGS = {"top_k": 15}
 
 
 # ── Agent State ──────────────────────────────────────────────────────────────
@@ -76,11 +76,20 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
         self, message_history: Optional[list[Message]] = None
     ) -> AgentState:
         system_prompt = (
-            f"You are a helpful banking customer service agent.\n\n"
-            f"## Domain Policy\n{self.domain_policy}\n\n"
-            f"Follow the policy strictly. Use the provided tools to help "
-            f"the customer. Always verify customer identity before making "
-            f"changes to their account."
+            f"You are an expert Rho-Bank customer service agent.\n\n"
+            f"{self.domain_policy}\n\n"
+            f"## Strategy\n"
+            f"- ALWAYS search the knowledge base BEFORE answering questions or taking actions. "
+            f"Search multiple times with different keywords to find all relevant policies and tools.\n"
+            f"- When KB results mention a tool, follow the FULL discovery workflow: "
+            f"unlock_discoverable_agent_tool(name) THEN call_discoverable_agent_tool(name, args). "
+            f"For user tools: give_discoverable_user_tool(name).\n"
+            f"- Authenticate the customer (verify 2 of 4: DOB, email, phone, address) "
+            f"and call log_verification BEFORE accessing or modifying account data.\n"
+            f"- Complete ALL required steps for the customer's request. Do not stop early "
+            f"or transfer to a human unless you have truly exhausted all options.\n"
+            f"- If a tool call fails or returns unexpected results, search the KB again "
+            f"with different terms and retry."
         )
         return AgentState(
             system_messages=[SystemMessage(role="system", content=system_prompt)],
