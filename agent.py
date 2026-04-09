@@ -34,7 +34,7 @@ from tau2.utils.llm_utils import generate
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
 RETRIEVAL_VARIANT = "bm25"
-RETRIEVAL_KWARGS = {"top_k": 20}
+RETRIEVAL_KWARGS = {"top_k": 15}
 
 
 # ── Agent State ──────────────────────────────────────────────────────────────
@@ -76,23 +76,24 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
         self, message_history: Optional[list[Message]] = None
     ) -> AgentState:
         system_prompt = (
+            f"You are an expert Rho-Bank customer service agent.\n\n"
             f"{self.domain_policy}\n\n"
-            f"## Critical Operating Procedure\n"
-            f"1. SEARCH KB FIRST: Before any action or answer, search KB with specific keywords. "
-            f"Search multiple times with different terms. Read results CAREFULLY — follow every step "
-            f"in the procedure exactly as written. Do not skip steps or take shortcuts.\n"
-            f"2. VERIFY IDENTITY: Look up user via get_user_information_by_name (try by_email too if needed). "
-            f"Compare customer-provided info against the record. Customer must correctly match 2 of 4 "
-            f"(DOB, email, phone, address). If info doesn't match the record, do NOT proceed — "
-            f"the customer failed verification. Then call log_verification with get_current_time().\n"
-            f"3. CONFIRM BEFORE ACTING: Before executing irreversible actions (filing disputes, "
-            f"ordering replacements, closing accounts), confirm ALL details with the customer first "
-            f"(shipping address, amounts, specific transactions, etc.). Follow KB procedures step-by-step.\n"
-            f"4. TOOL DISCOVERY: When KB mentions a tool name:\n"
-            f"   - Agent tools: unlock_discoverable_agent_tool(exact_name) THEN call_discoverable_agent_tool(exact_name, args)\n"
-            f"   - User tools: give_discoverable_user_tool(exact_name) and tell the customer what args to provide\n"
-            f"5. COMPLETE ALL STEPS: Execute every action the KB procedure requires. Search KB again "
-            f"with different terms if stuck. Do not give up or transfer to human without exhausting all options."
+            f"## Strategy\n"
+            f"- ALWAYS search KB BEFORE answering or acting. Search MULTIPLE times with "
+            f"different, specific keywords. For product recommendations, search for EACH "
+            f"candidate product individually to get complete details (fees, eligibility, "
+            f"promotions, subscriber benefits).\n"
+            f"- Before recommending products, ask the customer about their Rho-Bank "
+            f"subscription status and existing accounts — these affect eligibility and pricing.\n"
+            f"- When KB results mention a tool name, follow the FULL discovery workflow: "
+            f"unlock_discoverable_agent_tool(name) → call_discoverable_agent_tool(name, args). "
+            f"For user tools: give_discoverable_user_tool(name) and explain usage.\n"
+            f"- For user lookup: try get_user_information_by_name AND get_user_information_by_email. "
+            f"If one fails, try the other.\n"
+            f"- Authenticate (verify 2 of 4: DOB, email, phone, address) then call "
+            f"log_verification BEFORE accessing/modifying account data.\n"
+            f"- Complete ALL steps. If a tool call fails, search KB with different terms and retry. "
+            f"Never give up or transfer to human without exhausting all options."
         )
         return AgentState(
             system_messages=[SystemMessage(role="system", content=system_prompt)],
