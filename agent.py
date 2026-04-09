@@ -34,7 +34,7 @@ from tau2.utils.llm_utils import generate
 # Options: "bm25", "openai_embeddings", "qwen_embeddings", "grep_only",
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
-RETRIEVAL_VARIANT = "bm25_grep"
+RETRIEVAL_VARIANT = "bm25"
 RETRIEVAL_KWARGS = {"top_k": 15}
 
 
@@ -50,6 +50,7 @@ class AgentState:
     ):
         self.system_messages = system_messages
         self.messages = messages
+        self.seen_tool_names: set[str] = set()
 
 
 # ── Agent Implementation ─────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ):
         super().__init__(tools=tools, domain_policy=domain_policy)
         self.llm = llm
-        self.llm_args = llm_args or {"temperature": 0.2, "seed": 300}
+        self.llm_args = llm_args or {"temperature": 0.0, "seed": 300}
 
     def get_init_state(
         self, message_history: Optional[list[Message]] = None
@@ -76,7 +77,9 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
             f"{self.domain_policy}\n\n"
             f"## Strategy\n"
             f"- ALWAYS search KB BEFORE answering or acting. Search MULTIPLE times with "
-            f"different, specific keywords. Use grep to search for specific tool names or patterns.\n"
+            f"different, specific keywords. For product recommendations, search for EACH "
+            f"candidate product individually to get complete details (fees, eligibility, "
+            f"promotions, subscriber benefits).\n"
             f"- Before recommending products, ask the customer about their Rho-Bank "
             f"subscription status and existing accounts — these affect eligibility and pricing.\n"
             f"- When KB results mention a tool name, follow the FULL discovery workflow: "
@@ -108,19 +111,23 @@ class BankingAgent(HalfDuplexAgent[AgentState]):
     ) -> tuple[AssistantMessage, AgentState]:
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
-            # After KB search results, nudge the model about any discoverable tools found
+            # After KB search results, nudge the model about any NEW discoverable tools found
+            new_tools = set()
             for tm in message.tool_messages:
                 content = getattr(tm, 'content', '') or ''
-                tool_names = self._extract_tool_names(content)
-                if tool_names:
-                    nudge = (
-                        f"[Note: KB result mentions discoverable tools: {', '.join(tool_names)}. "
-                        f"Use unlock_discoverable_agent_tool(name) then call_discoverable_agent_tool(name, args) for agent tools, "
-                        f"or give_discoverable_user_tool(name) for user tools.]"
-                    )
-                    state.messages.append(
-                        SystemMessage(role="system", content=nudge)
-                    )
+                for name in self._extract_tool_names(content):
+                    if name not in state.seen_tool_names:
+                        new_tools.add(name)
+                        state.seen_tool_names.add(name)
+            if new_tools:
+                nudge = (
+                    f"[KB mentions tools: {', '.join(sorted(new_tools))}. "
+                    f"Agent tools: unlock_discoverable_agent_tool(name) then call_discoverable_agent_tool(name, args). "
+                    f"User tools: give_discoverable_user_tool(name).]"
+                )
+                state.messages.append(
+                    SystemMessage(role="system", content=nudge)
+                )
         else:
             state.messages.append(message)
 
@@ -143,5 +150,5 @@ def create_agent(tools, domain_policy, **kwargs):
         tools=tools,
         domain_policy=domain_policy,
         llm=kwargs.get("llm", "openai/gpt-5.4-mini"),
-        llm_args=kwargs.get("llm_args", {"temperature": 0.2, "seed": 300}),
+        llm_args=kwargs.get("llm_args", {"temperature": 0.0, "seed": 300}),
     )
