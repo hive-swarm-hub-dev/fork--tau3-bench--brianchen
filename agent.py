@@ -35,7 +35,7 @@ from tau2.utils.llm_utils import generate
 #          "full_kb", "no_knowledge"
 # NOTE: "golden_retrieval" is blocked by the eval harness.
 RETRIEVAL_VARIANT = "bm25"
-RETRIEVAL_KWARGS = {"top_k": 20}
+RETRIEVAL_KWARGS = {"top_k": 15}
 
 
 # ── Agent State ──────────────────────────────────────────────────────────────
